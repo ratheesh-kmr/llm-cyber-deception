@@ -1,0 +1,68 @@
+# ============================================================
+# Active Cyber Deception with LLM-Generated Lures
+# .gitignore
+# ============================================================
+
+# ── Python ────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# ── Environment / Secrets ─────────────────────────────────
+.env
+*.env.local
+*.env.production
+!.env.example
+
+# ── Database ──────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Logs ──────────────────────────────────────────────────
+logs/
+*.log
+
+# ── Node / Frontend ───────────────────────────────────────
+node_modules/
+dist/
+.vite/
+.parcel-cache/
+
+# ── IDE / OS ──────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Docker ────────────────────────────────────────────────
+*.dockerignore
+
+# ── Testing ───────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# ── Pytest ────────────────────────────────────────────────
+coverage.xml
+*.cover
+
+# ── Misc ──────────────────────────────────────────────────
+*.bak
+*.tmp
+.cache/

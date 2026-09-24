@@ -1,0 +1,141 @@
+version: '3.9'
+
+# ============================================================
+# Active Cyber Deception with LLM-Generated Lures
+# Docker Compose Configuration
+# 
+# SECURITY NOTE: This runs in an isolated network.
+# Do not expose ports to external networks in production.
+# ============================================================
+
+services:
+
+  # ── Backend API ─────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: deception-backend
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/app
+      - sqlite-data:/app/data
+      - ./logs:/app/logs
+    ports:
+      - "8000:8000"
+    networks:
+      - deception-internal
+    depends_on:
+      - deception-env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "deception.component=backend"
+      - "deception.synthetic=true"
+
+  # ── Deception Environment (Fake Company Portal) ──────────
+  deception-env:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.deception
+    container_name: deception-gateway
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8001:8001"
+    networks:
+      - deception-internal
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "deception.component=gateway"
+      - "deception.synthetic=true"
+
+  # ── Frontend Dashboard ───────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: deception-frontend
+    env_file:
+      - .env
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    networks:
+      - deception-internal
+    depends_on:
+      - backend
+    restart: unless-stopped
+    labels:
+      - "deception.component=frontend"
+
+  # ── Attack Simulator (Dev/Testing only) ─────────────────
+  simulator:
+    build:
+      context: ./simulator
+      dockerfile: Dockerfile
+    container_name: deception-simulator
+    env_file:
+      - .env
+    environment:
+      - TARGET_URL=http://deception-env:8001
+      - API_URL=http://backend:8000
+    networks:
+      - deception-internal
+    depends_on:
+      - backend
+      - deception-env
+    profiles:
+      - simulation
+    labels:
+      - "deception.component=simulator"
+      - "deception.synthetic=true"
+
+  # ── Ollama (Local LLM) - Optional ───────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: deception-ollama
+    volumes:
+      - ollama-models:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - deception-internal
+    profiles:
+      - ollama
+    restart: unless-stopped
+    labels:
+      - "deception.component=llm"
+
+# ── Networks ────────────────────────────────────────────────
+networks:
+  deception-internal:
+    driver: bridge
+    internal: false  # Set to true in production for full isolation
+    labels:
+      - "deception.network=internal"
+
+# ── Volumes ─────────────────────────────────────────────────
+volumes:
+  sqlite-data:
+    driver: local
+    labels:
+      - "deception.volume=database"
+  ollama-models:
+    driver: local
+    labels:
+      - "deception.volume=llm-models"
