@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from app.core.database import get_db
 from app.schemas.schemas import LureResponse, LureGenerateRequest, LureDeployRequest
 from app.models.database import Lure, Attacker
+from app.services.session_service import get_or_create_session
 from app.services.llm.generator import generate_lure
 from app.services.lure.deployment_manager import deploy_lure
 
@@ -15,16 +16,21 @@ def list_lures(db: Session = Depends(get_db)):
 
 @router.post("/generate", response_model=LureResponse)
 def generate_lure_endpoint(payload: LureGenerateRequest, db: Session = Depends(get_db)):
-    attacker = db.query(Attacker).filter(Attacker.session_id == payload.session_id).first()
-    interest = payload.interest_override or (attacker.behavior_type.lower() if attacker and attacker.behavior_type else "reconnaissance")
+    session_id = payload.session_id
+    if not session_id:
+        attacker = get_or_create_session(db, source_ip="127.0.0.1", user_agent="SOC-Console-Manual")
+        session_id = attacker.session_id
+    else:
+        attacker = db.query(Attacker).filter(Attacker.session_id == session_id).first()
 
-    lure = generate_lure(db, session_id=payload.session_id, interest=interest)
+    interest = payload.interest_override or (attacker.behavior_type.lower() if attacker and attacker.behavior_type else "reconnaissance")
+    lure = generate_lure(db, session_id=session_id, interest=interest)
     if not lure:
         raise HTTPException(status_code=500, detail="Failed to generate lure")
     return lure
 
 @router.post("/{lure_id}/deploy", response_model=LureResponse)
-def deploy_lure_endpoint(lure_id: str, payload: LureDeployRequest = None, db: Session = Depends(get_db)):
+def deploy_lure_endpoint(lure_id: str, payload: Optional[LureDeployRequest] = None, db: Session = Depends(get_db)):
     custom_endpoint = payload.endpoint_path if payload else None
     lure = deploy_lure(db, lure_id, custom_endpoint=custom_endpoint)
     if not lure:

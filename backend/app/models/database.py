@@ -13,8 +13,8 @@ from sqlalchemy import (
     Boolean, Column, DateTime, Float, ForeignKey,
     Integer, JSON, String, Text, create_engine, event
 )
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+from app.core.utils import utc_now
 
 Base = declarative_base()
 
@@ -30,8 +30,8 @@ class Attacker(Base):
     session_id = Column(String(36), unique=True, nullable=False, index=True)  # UUID
     source_ip = Column(String(45), nullable=False)  # IPv4 or IPv6
     user_agent = Column(String(500), nullable=True)
-    first_seen = Column(DateTime, nullable=False, default=datetime.utcnow)
-    last_seen = Column(DateTime, nullable=False, default=datetime.utcnow)
+    first_seen = Column(DateTime, nullable=False, default=utc_now)
+    last_seen = Column(DateTime, nullable=False, default=utc_now)
     risk_score = Column(Float, default=0.0)
     behavior_type = Column(String(50), nullable=True)  # e.g., RECONNAISSANCE
     status = Column(String(20), default="active")  # active | inactive | blocked
@@ -61,7 +61,7 @@ class Event(Base):
     event_type = Column(String(50), nullable=False)   # e.g., SUSPICIOUS_REQUEST
     endpoint = Column(String(500), nullable=False)
     method = Column(String(10), nullable=False)
-    timestamp = Column(DateTime, nullable=False, default=datetime.utcnow)
+    timestamp = Column(DateTime, nullable=False, default=utc_now)
     severity = Column(String(20), nullable=False)     # LOW | MEDIUM | HIGH | CRITICAL
     metadata_ = Column("metadata", JSON, nullable=True)  # headers, query params, etc.
     is_suspicious = Column(Boolean, default=False)
@@ -88,7 +88,7 @@ class Lure(Base):
     content = Column(Text, nullable=False)
     target_interest = Column(String(50), nullable=False)
     generated_by = Column(String(50), nullable=False)  # ollama | openai | mock
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     deployed_at = Column(DateTime, nullable=True)
     status = Column(String(20), default="generated")  # generated | deployed | retired
     endpoint_path = Column(String(200), nullable=True)
@@ -116,7 +116,7 @@ class LureInteraction(Base):
     session_id = Column(String(36), ForeignKey("attackers.session_id"),
                         nullable=False, index=True)
     interaction_type = Column(String(50), nullable=False)  # VIEW | DOWNLOAD | SUBMIT
-    timestamp = Column(DateTime, nullable=False, default=datetime.utcnow)
+    timestamp = Column(DateTime, nullable=False, default=utc_now)
     time_spent_seconds = Column(Float, nullable=True)
     metadata_ = Column("metadata", JSON, nullable=True)
 
@@ -140,7 +140,7 @@ class AttackSession(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     session_id = Column(String(36), ForeignKey("attackers.session_id"),
                         nullable=False, index=True)
-    started_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    started_at = Column(DateTime, nullable=False, default=utc_now)
     ended_at = Column(DateTime, nullable=True)
     risk_score = Column(Float, default=0.0)
     attack_stage = Column(String(50), default="RECONNAISSANCE")
@@ -171,6 +171,6 @@ class LLMGeneration(Base):
     output = Column(JSON, nullable=True)             # Structured LLM response
     validation_status = Column(String(20), nullable=False)  # pending | passed | failed
     validation_errors = Column(JSON, nullable=True)  # List of validation error messages
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     processing_time_ms = Column(Float, nullable=True)
     session_id = Column(String(36), nullable=True, index=True)

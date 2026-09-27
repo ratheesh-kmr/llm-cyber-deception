@@ -1,15 +1,15 @@
 import uuid
-from datetime import datetime
 from typing import Optional, List
 from sqlalchemy.orm import Session
 from app.models.database import Attacker, AttackSession
+from app.core.utils import utc_now
 
 def get_or_create_session(db: Session, source_ip: str, user_agent: Optional[str] = None, session_id: Optional[str] = None) -> Attacker:
     """Finds existing session by session_id or creates a new one."""
     if session_id:
         attacker = db.query(Attacker).filter(Attacker.session_id == session_id).first()
         if attacker:
-            attacker.last_seen = datetime.utcnow()
+            attacker.last_seen = utc_now()
             db.commit()
             return attacker
 
@@ -19,8 +19,8 @@ def get_or_create_session(db: Session, source_ip: str, user_agent: Optional[str]
         session_id=new_id,
         source_ip=source_ip,
         user_agent=user_agent or "Unknown",
-        first_seen=datetime.utcnow(),
-        last_seen=datetime.utcnow(),
+        first_seen=utc_now(),
+        last_seen=utc_now(),
         risk_score=0.0,
         behavior_type="RECONNAISSANCE",
         status="active"
@@ -29,7 +29,7 @@ def get_or_create_session(db: Session, source_ip: str, user_agent: Optional[str]
 
     attack_session = AttackSession(
         session_id=new_id,
-        started_at=datetime.utcnow(),
+        started_at=utc_now(),
         risk_score=0.0,
         attack_stage="RECONNAISSANCE",
         total_events=0,

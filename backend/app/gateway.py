@@ -24,6 +24,16 @@ gateway_app.add_middleware(
     allow_headers=["*"],
 )
 
+def get_base_prefix(request: Request) -> str:
+    path = request.url.path
+    return "/gateway" if path.startswith("/gateway") else ""
+
+def normalize_path(path: str) -> str:
+    if path.startswith("/gateway"):
+        sub = path[len("/gateway"):]
+        return sub if sub.startswith("/") else f"/{sub}"
+    return path
+
 def get_session_and_log(request: Request, db: Session):
     session_id = request.headers.get("X-Session-ID") or request.cookies.get("deception_session")
     client_ip = request.client.host if request.client else "127.0.0.1"
@@ -44,9 +54,11 @@ def get_session_and_log(request: Request, db: Session):
 
     return attacker
 
-@gateway_app.get("/", response_class=HTMLResponse)
+@gateway_app.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def gateway_home(request: Request, db: Session = Depends(get_db)):
     attacker = get_session_and_log(request, db)
+    base = get_base_prefix(request)
+
     html = f"""
     <!DOCTYPE html>
     <html>
@@ -56,7 +68,7 @@ def gateway_home(request: Request, db: Session = Depends(get_db)):
             body {{ font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; background: #f4f6f9; color: #333; }}
             header {{ background: #0f172a; color: white; padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; }}
             header h1 {{ margin: 0; font-size: 24px; font-weight: 600; color: #38bdf8; }}
-            nav a {{ color: #94a3b8; text-decoration: none; margin-left: 20px; font-size: 14px; }}
+            nav a {{ color: #94a3b8; text-decoration: none; margin-left: 20px; font-size: 14px; transition: color 0.2s; }}
             nav a:hover {{ color: white; }}
             .container {{ max-width: 1000px; margin: 40px auto; padding: 0 20px; }}
             .hero {{ background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }}
@@ -71,10 +83,10 @@ def gateway_home(request: Request, db: Session = Depends(get_db)):
         <header>
             <h1>{settings.FAKE_COMPANY_NAME}</h1>
             <nav>
-                <a href="/">Home</a>
-                <a href="/login">Employee Login</a>
-                <a href="/admin">Internal Admin</a>
-                <a href="/documents">Documents</a>
+                <a href="{base}/">Home</a>
+                <a href="{base}/login">Employee Login</a>
+                <a href="{base}/admin">Internal Admin</a>
+                <a href="{base}/documents">Documents</a>
             </nav>
         </header>
         <div class="container">
@@ -86,7 +98,7 @@ def gateway_home(request: Request, db: Session = Depends(get_db)):
                 <div class="card">
                     <h3>Internal Portal</h3>
                     <p>Access employee services and system documentation.</p>
-                    <a href="/login" style="color:#0284c7;">Sign In &rarr;</a>
+                    <a href="{base}/login" style="color:#0284c7; text-decoration: none; font-weight: bold;">Sign In &rarr;</a>
                 </div>
                 <div class="card">
                     <h3>System Status</h3>
@@ -94,7 +106,7 @@ def gateway_home(request: Request, db: Session = Depends(get_db)):
                 </div>
                 <div class="card">
                     <h3>Security Policy</h3>
-                    <p>Internal network access is strictly monitored.</p>
+                    <p>Internal network access is strictly monitored and all interactions logged.</p>
                 </div>
             </div>
         </div>
@@ -108,17 +120,22 @@ def gateway_home(request: Request, db: Session = Depends(get_db)):
     response.set_cookie(key="deception_session", value=attacker.session_id)
     return response
 
-@gateway_app.get("/login", response_class=HTMLResponse)
-@gateway_app.get("/admin", response_class=HTMLResponse)
-@gateway_app.get("/config", response_class=HTMLResponse)
-@gateway_app.get("/backup", response_class=HTMLResponse)
-@gateway_app.get("/documents", response_class=HTMLResponse)
+@gateway_app.api_route("/login", methods=["GET", "HEAD"], response_class=HTMLResponse)
+@gateway_app.api_route("/admin", methods=["GET", "HEAD"], response_class=HTMLResponse)
+@gateway_app.api_route("/config", methods=["GET", "HEAD"], response_class=HTMLResponse)
+@gateway_app.api_route("/backup", methods=["GET", "HEAD"], response_class=HTMLResponse)
+@gateway_app.api_route("/documents", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def gateway_pages(request: Request, db: Session = Depends(get_db)):
     attacker = get_session_and_log(request, db)
     path = request.url.path
+    norm_path = normalize_path(path)
+    base = get_base_prefix(request)
 
     # Check if this endpoint matches a deployed lure!
-    lure = db.query(Lure).filter(Lure.endpoint_path == path, Lure.status == "deployed").first()
+    lure = db.query(Lure).filter(
+        (Lure.endpoint_path == path) | (Lure.endpoint_path == norm_path),
+        Lure.status == "deployed"
+    ).first()
     if lure:
         record_interaction(db, lure_id=lure.lure_id, session_id=attacker.session_id, interaction_type="VIEW")
         return PlainTextResponse(content=lure.content)
@@ -131,19 +148,22 @@ def gateway_pages(request: Request, db: Session = Depends(get_db)):
         <style>
             body {{ font-family: sans-serif; background: #0f172a; color: #f8fafc; padding: 50px; text-align: center; }}
             .box {{ background: #1e293b; padding: 40px; border-radius: 8px; max-width: 450px; margin: 0 auto; border: 1px solid #334155; }}
-            input {{ width: 90%; padding: 10px; margin: 10px 0; background: #0f172a; border: 1px solid #475569; color: white; border-radius: 4px; }}
-            button {{ width: 95%; padding: 12px; background: #0284c7; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }}
+            input {{ width: 90%; padding: 10px; margin: 10px 0; background: #0f172a; border: 1px solid #475569; color: white; border-radius: 4px; box-sizing: border-box; }}
+            button {{ width: 90%; padding: 12px; background: #0284c7; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }}
+            a {{ color: #38bdf8; font-size: 13px; text-decoration: none; display: inline-block; margin-top: 15px; }}
         </style>
     </head>
     <body>
         <div class="box">
             <h2>{settings.FAKE_COMPANY_NAME} Access Panel</h2>
             <p style="color: #94a3b8;">Restricted Area: {path}</p>
-            <form action="/login" method="POST">
+            <form action="{base}/login" method="POST">
                 <input type="text" name="username" placeholder="Username" required /><br/>
                 <input type="password" name="password" placeholder="Password" required /><br/>
                 <button type="submit">Authenticate</button>
             </form>
+            <br/>
+            <a href="{base}/">&larr; Return to Meridian Portal</a>
         </div>
     </body>
     </html>
@@ -155,37 +175,47 @@ def gateway_login(request: Request, db: Session = Depends(get_db)):
     attacker = get_session_and_log(request, db)
     return JSONResponse(status_code=401, content={"error": "Unauthorized", "detail": "Invalid credentials provided."})
 
-@gateway_app.get("/.env")
-@gateway_app.get("/config/database")
-@gateway_app.get("/backup/db")
-@gateway_app.get("/backup/keys")
-@gateway_app.get("/robots.txt")
-@gateway_app.get("/sitemap.xml")
-@gateway_app.get("/.git")
+@gateway_app.api_route("/.env", methods=["GET", "HEAD"])
+@gateway_app.api_route("/config/database", methods=["GET", "HEAD"])
+@gateway_app.api_route("/backup/db", methods=["GET", "HEAD"])
+@gateway_app.api_route("/backup/keys", methods=["GET", "HEAD"])
+@gateway_app.api_route("/robots.txt", methods=["GET", "HEAD"])
+@gateway_app.api_route("/sitemap.xml", methods=["GET", "HEAD"])
+@gateway_app.api_route("/.git", methods=["GET", "HEAD"])
 def gateway_files(request: Request, db: Session = Depends(get_db)):
     attacker = get_session_and_log(request, db)
     path = request.url.path
+    norm_path = normalize_path(path)
 
     # Check for deployed lure matching endpoint
-    lure = db.query(Lure).filter(Lure.endpoint_path == path, Lure.status == "deployed").first()
+    lure = db.query(Lure).filter(
+        (Lure.endpoint_path == path) | (Lure.endpoint_path == norm_path),
+        Lure.status == "deployed"
+    ).first()
     if lure:
         record_interaction(db, lure_id=lure.lure_id, session_id=attacker.session_id, interaction_type="VIEW")
         return PlainTextResponse(content=lure.content)
 
     # If no specific deployed lure, return synthetic default probe responses
-    if path == "/robots.txt":
+    if norm_path == "/robots.txt":
         return PlainTextResponse("User-agent: *\nDisallow: /admin/\nDisallow: /config/\nDisallow: /backup/\n")
-    if path == "/sitemap.xml":
+    if norm_path == "/sitemap.xml":
         return PlainTextResponse("<?xml version=\"1.0\" encoding=\"UTF-8\"?><urlset><url><loc>http://meridian-tech.internal/</loc></url></urlset>")
 
     return PlainTextResponse(content=f"# Synthetic file endpoint for {path}\n# Access logged by Meridian Security Gate", status_code=404)
 
-@gateway_app.get("/lures/{path:path}")
+@gateway_app.api_route("/lures/{path:path}", methods=["GET", "HEAD"])
 def gateway_lure_dynamic(path: str, request: Request, db: Session = Depends(get_db)):
     attacker = get_session_and_log(request, db)
     full_path = f"/lures/{path}"
+    norm_full_path = normalize_path(request.url.path)
 
-    lure = db.query(Lure).filter((Lure.endpoint_path == full_path) | (Lure.title == path)).first()
+    lure = db.query(Lure).filter(
+        (Lure.endpoint_path == full_path) |
+        (Lure.endpoint_path == norm_full_path) |
+        (Lure.endpoint_path == request.url.path) |
+        (Lure.title == path)
+    ).first()
     if lure:
         record_interaction(db, lure_id=lure.lure_id, session_id=attacker.session_id, interaction_type="VIEW")
         return PlainTextResponse(content=lure.content)

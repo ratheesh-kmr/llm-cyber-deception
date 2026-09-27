@@ -1,7 +1,7 @@
-from datetime import datetime
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 from app.models.database import Event, Attacker, AttackSession
+from app.core.utils import utc_now
 from app.services.detection.suspicious_patterns import analyze_request
 from app.services.detection.scoring_engine import evaluate_risk
 from app.services.detection.interest_classifier import classify_interest
@@ -26,7 +26,7 @@ def log_event(
         event_type=event_type,
         endpoint=endpoint,
         method=method,
-        timestamp=datetime.utcnow(),
+        timestamp=utc_now(),
         severity=severity,
         metadata_=metadata or {},
         is_suspicious=is_suspicious,
@@ -47,7 +47,7 @@ def log_event(
         )
 
         attacker.risk_score = new_score
-        attacker.last_seen = datetime.utcnow()
+        attacker.last_seen = utc_now()
 
         # Update attack session summary
         attack_session = db.query(AttackSession).filter(AttackSession.session_id == session_id).first()

@@ -1,6 +1,6 @@
-from datetime import datetime
 from sqlalchemy.orm import Session
 from app.models.database import LureInteraction, Attacker, AttackSession
+from app.core.utils import utc_now
 from app.services.detection.scoring_engine import calculate_risk_level
 from app.services.detection.stage_tracker import determine_attack_stage
 
@@ -10,7 +10,7 @@ def record_interaction(db: Session, lure_id: str, session_id: str, interaction_t
         lure_id=lure_id,
         session_id=session_id,
         interaction_type=interaction_type,
-        timestamp=datetime.utcnow(),
+        timestamp=utc_now(),
         metadata_=metadata or {}
     )
     db.add(interaction)
@@ -19,7 +19,7 @@ def record_interaction(db: Session, lure_id: str, session_id: str, interaction_t
     attacker = db.query(Attacker).filter(Attacker.session_id == session_id).first()
     if attacker:
         attacker.risk_score += 5.0
-        attacker.last_seen = datetime.utcnow()
+        attacker.last_seen = utc_now()
         db.add(attacker)
 
     attack_session = db.query(AttackSession).filter(AttackSession.session_id == session_id).first()

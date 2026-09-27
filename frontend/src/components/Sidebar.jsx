@@ -93,7 +93,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
       }}>
         <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '8px' }}>Target Deception Portal</div>
         <a 
-          href="http://127.0.0.1:8001" 
+          href="http://127.0.0.1:8000/gateway/" 
           target="_blank" 
           rel="noreferrer"
           style={{

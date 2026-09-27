@@ -1,7 +1,7 @@
-from datetime import datetime
 from typing import Optional
 from sqlalchemy.orm import Session
 from app.models.database import Lure
+from app.core.utils import utc_now
 
 def deploy_lure(db: Session, lure_id: str, custom_endpoint: Optional[str] = None) -> Optional[Lure]:
     """Deploys a generated lure so it becomes active and accessible on gateway endpoints."""
@@ -10,7 +10,7 @@ def deploy_lure(db: Session, lure_id: str, custom_endpoint: Optional[str] = None
         return None
 
     lure.status = "deployed"
-    lure.deployed_at = datetime.utcnow()
+    lure.deployed_at = utc_now()
     if custom_endpoint:
         lure.endpoint_path = custom_endpoint
     db.commit()

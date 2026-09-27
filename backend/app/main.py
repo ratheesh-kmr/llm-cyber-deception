@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,10 +7,16 @@ from app.core.database import init_db
 from app.api.routes import sessions, events, risk, lures, interactions, dashboard, simulation
 from app.gateway import gateway_app
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
 app = FastAPI(
     title=settings.APP_NAME,
     version="1.0.0",
-    description="Active Cyber Deception Platform with LLM-Generated Lures Backend API"
+    description="Active Cyber Deception Platform with LLM-Generated Lures Backend API",
+    lifespan=lifespan
 )
 
 app.add_middleware(
@@ -19,10 +26,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.on_event("startup")
-def on_startup():
-    init_db()
 
 @app.get("/")
 def api_root():
